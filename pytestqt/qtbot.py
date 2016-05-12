@@ -2,54 +2,9 @@ import functools
 import contextlib
 import weakref
 from pytestqt.wait_signal import SignalBlocker, MultiSignalBlocker, SignalTimeoutError, SignalEmittedSpy
-from pytestqt.qt_compat import QtTest, QApplication
+from pytestqt.qt_compat import qt_api
 
 
-def _inject_qtest_methods(cls):
-    """
-    Injects QTest methods into the given class QtBot, so the user can access
-    them directly without having to import QTest.
-    """
-
-    def create_qtest_proxy_method(method_name):
-
-        if hasattr(QtTest.QTest, method_name):
-            qtest_method = getattr(QtTest.QTest, method_name)
-
-            def result(*args, **kwargs):
-                return qtest_method(*args, **kwargs)
-
-            functools.update_wrapper(result, qtest_method)
-            return staticmethod(result)
-        else:
-            return None  # pragma: no cover
-
-    # inject methods from QTest into QtBot
-    method_names = [
-        'keyPress',
-        'keyClick',
-        'keyClicks',
-        'keyEvent',
-        'keyPress',
-        'keyRelease',
-        'keyToAscii',
-
-        'mouseClick',
-        'mouseDClick',
-        'mouseEvent',
-        'mouseMove',
-        'mousePress',
-        'mouseRelease',
-    ]
-    for method_name in method_names:
-        method = create_qtest_proxy_method(method_name)
-        if method is not None:
-            setattr(cls, method_name, method)
-
-    return cls
-
-
-@_inject_qtest_methods
 class QtBot(object):
     """
     Instances of this class are responsible for sending events to `Qt` objects (usually widgets),
@@ -186,12 +141,12 @@ class QtBot(object):
         .. note:: In Qt5, the actual method called is qWaitForWindowExposed,
             but this name is kept for backward compatibility
         """
-        if hasattr(QtTest.QTest, 'qWaitForWindowShown'):  # pragma: no cover
+        if hasattr(qt_api.QtTest.QTest, 'qWaitForWindowShown'):  # pragma: no cover
             # PyQt4 and PySide
-            QtTest.QTest.qWaitForWindowShown(widget)
+            qt_api.QtTest.QTest.qWaitForWindowShown(widget)
         else:  # pragma: no cover
             # PyQt5
-            QtTest.QTest.qWaitForWindowExposed(widget)
+            qt_api.QtTest.QTest.qWaitForWindowExposed(widget)
 
     wait_for_window_shown = waitForWindowShown  # pep-8 alias
 
@@ -213,7 +168,7 @@ class QtBot(object):
             if widget is not None:
                 widget_and_visibility.append((widget, widget.isVisible()))
 
-        QApplication.instance().exec_()
+        qt_api.QApplication.instance().exec_()
 
         for widget, visible in widget_and_visibility:
             widget.setVisible(visible)
@@ -345,6 +300,50 @@ class QtBot(object):
         spy.assert_not_emitted()
 
     assert_not_emitted = assertNotEmitted  # pep-8 alias
+
+    @classmethod
+    def _inject_qtest_methods(cls):
+        """
+        Injects QTest methods into the given class QtBot, so the user can access
+        them directly without having to import QTest.
+        """
+
+        def create_qtest_proxy_method(method_name):
+
+            if hasattr(qt_api.QtTest.QTest, method_name):
+                qtest_method = getattr(qt_api.QtTest.QTest, method_name)
+
+                def result(*args, **kwargs):
+                    return qtest_method(*args, **kwargs)
+
+                functools.update_wrapper(result, qtest_method)
+                return staticmethod(result)
+            else:
+                return None  # pragma: no cover
+
+        # inject methods from QTest into QtBot
+        method_names = [
+            'keyPress',
+            'keyClick',
+            'keyClicks',
+            'keyEvent',
+            'keyPress',
+            'keyRelease',
+            'keyToAscii',
+
+            'mouseClick',
+            'mouseDClick',
+            'mouseEvent',
+            'mouseMove',
+            'mousePress',
+            'mouseRelease',
+        ]
+        for method_name in method_names:
+            method = create_qtest_proxy_method(method_name)
+            if method is not None:
+                setattr(cls, method_name, method)
+
+        return cls
 
 
 
